@@ -19,7 +19,7 @@ import math
 import traceback
 import sys
 
-def _prepare_data(AUDIO_FILE_PATH, OUTPUT_FOLDER, file_size_thresh = 100, min_highest_amplitude=-25):
+def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thres = 3000, file_size_thresh = 100, min_highest_amplitude=-25):
 	utils.create_folder(OUTPUT_FOLDER)
 	cnt = 0
 	exit = False
@@ -47,9 +47,9 @@ def _prepare_data(AUDIO_FILE_PATH, OUTPUT_FOLDER, file_size_thresh = 100, min_hi
 
 					if audio_file:
 						duration = len(audio_file) 
-						if duration <= 3000:
-							start = int((3000 - duration)/2)
-							new_audio = AudioSegment.silent(3000) 
+						if duration <= duration_thres :
+							start = int((duration_thres - duration)/2)
+							new_audio = AudioSegment.silent(duration_thres) 
 							new_audio = new_audio.overlay(audio_file, position=start)
 							new_audio = new_audio.set_channels(1)
 							new_audio = new_audio.set_sample_width(2)
@@ -67,9 +67,30 @@ def _prepare_data(AUDIO_FILE_PATH, OUTPUT_FOLDER, file_size_thresh = 100, min_hi
 			pass
 
 def prepare_mozilla_common_data(AUDIO_FILE_PATH):
-	OUTPUT_FOLDER = "/audio_files/zero_class"
-	_prepare_data(AUDIO_FILE_PATH, OUTPUT_FOLDER, 17)
+	OUTPUT_FOLDER = "/audio_files/common_voice_corpus_1"
+	exists = os.path.exists(OUTPUT_FOLDER)
+	if not exists  or ( exists and len(os.listdir(OUTPUT_FOLDER)) <= 20000):
+		_fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, file_size_thresh = 17)
+
+	audio_clips = os.listdir(OUTPUT_FOLDER) # total clips
+	OUTPUT_FOLDER_2 ="/audio_files/zero_class"
+
+	exists = os.path.exists(OUTPUT_FOLDER_2)
+	if not exists  or ( exists and len(os.listdir(OUTPUT_FOLDER_2)) != 10000):
+		utils.create_folder(OUTPUT_FOLDER_2 )
+
+		#Choose 10000 audio clips randomly
+		np.random.shuffle(audio_clips)
+		audio_clips = audio_clips[:9999]
+
+		#save audio clips 
+		for aud_clip in audio_clips:
+			src_file = os.path.join(OUTPUT_FOLDER, aud_clip) 
+			dst_file = os.path.join(OUTPUT_FOLDER_2, aud_clip) 
+			shutil.copyfile(src_file, dst_file)
+			print('copying',src_file,dst_file)
+	
 
 def prepare_hey_ida_data(AUDIO_FILE_PATH):
 	OUTPUT_FOLDER = "/audio_files/one_class"
-	_prepare_data(AUDIO_FILE_PATH, OUTPUT_FOLDER, min_highest_amplitude = -100)
+	_fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, min_highest_amplitude = -100)

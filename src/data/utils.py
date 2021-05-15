@@ -9,8 +9,9 @@
 """
 
 """
+import os
 
-from data import prepare_mozilla_common_data, prepare_hey_ida_data
+def create_folder(path):
+	if not os.path.exists(path):
+		os.makedirs(path)
 
-# prepare_hey_ida_data("/audio_files")
-prepare_mozilla_common_data("/audio_files2")

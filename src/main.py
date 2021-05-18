@@ -10,18 +10,22 @@
 
 """
 
-from data import prepare_mozilla_common_data, prepare_hey_ida_data
-from data import utils 
 
-prepare_hey_ida_data("/audio_files/originals/test")
-# prepare_mozilla_common_data("/audio_files2")
+def prepare_data():
+	from data import prepare_mozilla_common_data, prepare_hey_ida_data
+	from data import utils 
+	utils.generate_background_noise_clips("/audio_files/background_noise","/audio_files/background_noise_chunks")
+	prepare_hey_ida_data("/audio_files/originals/")
+	prepare_mozilla_common_data("/audio_files2")
 
-# utils.generate_background_noise_clips("/audio_files/originals/background_noise","/audio_files/background_noise_chunks")
 
-# import librosa
+def create_dataset():
+	from data import generate_dataset
+	generate_dataset()
 
-# y, sr = librosa.load("/audio_files/originals/joe/1.m4a")
-# print(len(y),sr)
 
-# librosa.output.write_wav('test.wav', y, sr)
+
+if __name__ == "__main__":
+	# prepare_data()
+	create_dataset()
 

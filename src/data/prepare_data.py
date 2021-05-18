@@ -21,25 +21,23 @@ import sys
 from glob import glob
 
 BACKGROUND_NOISE_FOLDER = None
-start, end = 0, 3
+n_idx = 0
 def get_next_background_noise_chunk(audio_file):
-	global start, end
-	chunk = BACKGROUND_NOISE_FOLDER[start:end]
+	global n_idx
+	chunk = BACKGROUND_NOISE_FOLDER[n_idx:n_idx+3]
 	n_chunks = list()
 	for n_chunk_path in chunk:
 		try:
 			noise = AudioSegment.from_file(n_chunk_path) 
-			noise.apply_gain(-noise.dBFS*0.5)
-			# noise= AudioSegment.silent(3000) 
-			# noise = noise.apply_gain(audio_file.dBFS)
+			noise = noise.apply_gain(noise.dBFS*0.2)
 			n_chunks.append(noise)
 		except:
 			traceback.print_exc()
-	start += 3
-	end += 3
-	if start >= len(BACKGROUND_NOISE_FOLDER) or end >= len(BACKGROUND_NOISE_FOLDER):
-		start = 0
-		end = 0
+	n_idx += 3
+	if n_idx > len(BACKGROUND_NOISE_FOLDER)-3:
+		np.random.shuffle(BACKGROUND_NOISE_FOLDER)
+		n_idx = 0
+	assert len(n_chunks) == 3
 	return n_chunks
 
 
@@ -56,7 +54,11 @@ def speed_change(sound, speed=1.0):
 
 def _speed_update(audio_file):
 	clips = list()
-	speeds = [0.9,1.2]
+	if audio_file.duration_seconds < 1.5:
+		speeds = [0.75,0.85]
+	else:
+		speeds = [0.9,1.1]
+
 	for sp in speeds:
 		new_audio = speed_change(audio_file,sp)
 		rate = sp
@@ -79,6 +81,8 @@ def _gain_update(audio_file):
 def _add_background_noise(audio_file,duration_thres):
 	clips = list()
 	noise_chunks = get_next_background_noise_chunk(audio_file)
+	if len(noise_chunks) != 3:
+		input('differente chunks')
 	end = duration_thres - len(audio_file)
 	mid = int(end/2)
 	positions = [0,mid,end]
@@ -87,13 +91,13 @@ def _add_background_noise(audio_file,duration_thres):
 		if pos < 0:
 			continue
 		n_chunk = noise_chunks[i]
-		new_audio = n_chunk.overlay(audio_file,position=pos,gain_during_overlay=6)
+		new_audio = n_chunk.overlay(audio_file,position=pos,gain_during_overlay=10)
 		clips.append(new_audio)
 
 	# positioning the main audio clip around the silence noise
 	silence = AudioSegment.silent(duration_thres) 
 	new_audio =silence.overlay(audio_file,position=mid)
-	clips.append(audio_file)
+	clips.append(new_audio)
 	return clips
 
 
@@ -107,15 +111,11 @@ def _augment_in_time_domain(audio_file, duration_thres):
 	n_clips_cnt =0
 	for sclip in s_clips:
 		g_clips = _gain_update(sclip)
-		# print('g_clips',len(g_clips))
 		for gclip in g_clips:
 			g_clips_cnt +=1
 			n_clips = _add_background_noise(gclip,duration_thres)
-			# print('n_clips',len(n_clips))
 			for nclip in n_clips:
 				augmented_clips.append(nclip)
-	# print('total g_clips',g_clips_cnt)
-	# print('total n_clips',len(augmented_clips))
 	return augmented_clips
 
 def _augment_audio(audio_file, duration_thres):
@@ -123,8 +123,8 @@ def _augment_audio(audio_file, duration_thres):
 
 def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thres = 3000, file_size_thresh = 100, min_highest_amplitude=-25, augment = False):
 	utils.create_folder(OUTPUT_FOLDER)
-	cnt = 0
 	exit = False
+	global_cnt = 0
 	for root, dirs, filenames in os.walk(AUDIO_FILE_PATH):
 		try:
 			if root == OUTPUT_FOLDER:
@@ -133,6 +133,16 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 				if 'MACOSX' in d:
 					print ('deleting {}/{}'.format(root,d))
 					shutil.rmtree(os.path.join(root,d))
+			
+			if augment:
+				pattern = os.path.join(OUTPUT_FOLDER,'{}_file_*.wav'.format(os.path.basename(root)))
+				already_converted = glob(pattern)
+				msg = ""
+				if len(already_converted) > 0 and len(filenames)*36 == len(already_converted): # 36 new audio clips are created per original audio clip
+					print(root,"-> DONE")
+					continue
+
+			cnt = 0
 			for f in filenames:
 				file_path = os.path.join(root,f)
 				size =math.ceil(os.path.getsize(file_path)/1024)
@@ -150,7 +160,8 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 					if audio_file:
 						duration = len(audio_file) 
 						if duration <= duration_thres :
-							print(cnt,file_path)
+							global_cnt +=1
+							print(global_cnt,file_path,"-->")
 							clips = list()
 							if augment:
 								clips = _augment_audio(audio_file,duration_thres)
@@ -161,13 +172,16 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 								clips.append(new_audio)
 
 							for clip in clips:
+								out_file = os.path.join(OUTPUT_FOLDER,'{}_file_{:08d}.wav'.format(os.path.basename(root),cnt))
 								new_audio = clip.set_channels(1)
 								new_audio = new_audio.set_sample_width(2)
 								new_audio = new_audio.set_frame_rate(16000)
-								out_file = os.path.join(OUTPUT_FOLDER,'file_{:04d}.wav'.format(cnt))
 								new_audio.export(out_file,format="wav")
-								# print(cnt,file_path, "gain: {}".format(clip.dBFS))
 								cnt += 1
+								print(global_cnt,file_path,"-->", out_file)
+								if len(new_audio) != 3000:
+									input("{} wrong duration, {} ".format(file_path, len(new_audio)))
+
 			if exit:
 				break
 		except KeyboardInterrupt:
@@ -183,15 +197,15 @@ def prepare_mozilla_common_data(AUDIO_FILE_PATH):
 		_fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, file_size_thresh = 17)
 
 	audio_clips = os.listdir(OUTPUT_FOLDER) # total clips
-	OUTPUT_FOLDER_2 ="/audio_files/zero_class"
+	OUTPUT_FOLDER_2 ="/audio_files/dataset/classes/zero_class"
 
 	exists = os.path.exists(OUTPUT_FOLDER_2)
 	if not exists  or ( exists and len(os.listdir(OUTPUT_FOLDER_2)) != 10000):
 		utils.create_folder(OUTPUT_FOLDER_2 )
 
 		#Choose 10000 audio clips randomly
-		np.random.shuffle(audio_clips)
-		audio_clips = audio_clips[:10000]
+		# np.random.shuffle(audio_clips)
+		# audio_clips = audio_clips[:10000]
 
 		#save audio clips 
 		for aud_clip in audio_clips:
@@ -204,7 +218,7 @@ def prepare_mozilla_common_data(AUDIO_FILE_PATH):
 	
 
 def prepare_hey_ida_data(AUDIO_FILE_PATH):
-	OUTPUT_FOLDER = "/audio_files/one_class"
+	OUTPUT_FOLDER = "/audio_files/dataset/classes/one_class"
 	global BACKGROUND_NOISE_FOLDER
 	BACKGROUND_NOISE_FOLDER = glob("/audio_files/background_noise_chunks/*.wav")
 	np.random.shuffle(BACKGROUND_NOISE_FOLDER)

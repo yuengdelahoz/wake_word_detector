@@ -41,13 +41,17 @@ def generate_background_noise_clips(AUDIO_FILE_PATH, OUTPUT_FOLDER, split_every_
 				length = split_every_x_seconds * 1000 # this is in miliseconds
 				chunks = make_chunks(audio_file, length)
 				np.random.shuffle(chunks)
-				chunks = chunks[0:100] # 5 minutes
+				k = 600 # audio clips counter
 				for clip in chunks:
+					if clip.duration_seconds != split_every_x_seconds: # ignore audio clips that are not split_every_x_seconds in duration
+						continue
+					k -= 1
 					new_audio = clip.set_channels(1)
 					new_audio = new_audio.set_sample_width(2)
 					new_audio = new_audio.set_frame_rate(16000)
 					out_file = os.path.join(OUTPUT_FOLDER,'file_{:04d}.wav'.format(cnt))
-					print(file_path,'->',out_file)
+					print(file_path,'->',out_file, len(new_audio))
 					new_audio.export(out_file,format="wav")
 					cnt += 1
-
+					if k < 0:
+						break

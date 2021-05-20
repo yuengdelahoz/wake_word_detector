@@ -10,7 +10,7 @@
 
 """
 import os
-from pydub import AudioSegment, silence, effects
+from pydub import AudioSegment
 from pydub.utils import make_chunks
 import numpy as np
 import librosa

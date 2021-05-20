@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:latest-gpu
+FROM tensorflow/tensorflow:2.5.0-gpu
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt update
 RUN apt install -y libsndfile1 

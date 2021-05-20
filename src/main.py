@@ -21,19 +21,22 @@ def create_dataset():
 	from data import generate_dataset
 	generate_dataset()
 
-def audiosegment_to_librosawav(audiosegment):    
-	channel_sounds = audiosegment.split_to_mono()
-	samples = [s.get_array_of_samples() for s in channel_sounds]
+def start_training():
+	from train import build_and_train
+	build_and_train()
 
-	fp_arr = np.array(samples).T.astype(np.float32)
-	fp_arr /= np.iinfo(samples[0].typecode).max
-	fp_arr = fp_arr.reshape(-1)
-
-	return fp_arr
+def analyze_mic_data():
+	from detection import Detector
+	detector = Detector()
+	detector.start()
+	while True:
+		pass
 
 if __name__ == "__main__":
 	# prepare_data()
-	create_dataset()
+	# create_dataset()
+	# start_training()
+	analyze_mic_data()
 	
 
 

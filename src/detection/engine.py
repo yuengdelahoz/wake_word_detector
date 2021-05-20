@@ -10,9 +10,12 @@
 
 """
 # from python_speech_features import mfcc
+import tensorflow as tf
+from ..utils import  timing_val
 
-# class TriggerDetector:
-	# def __init__(self):
-		# pass
+class TriggerDetector:
+	def __init__(self):
+		pass
 
-	# def predict(self,bytestring): 
+	@timing_val
+	def predict(self,mfcc_feat): 

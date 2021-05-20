@@ -11,69 +11,63 @@
 """
 import pyaudio
 import numpy as np
-# from .engine import Engine
 from python_speech_features import mfcc
 import time
-from threading import Thread, Event
-
-def timing_val(func):
-	def wrapper(*arg, **kw):
-		t1 = time.time()*1000
-		f = func(*arg, **kw)
-		t2 = time.time()*1000
-		print('It took {:.2f} ms to execute function {}'.format((t2 - t1), func.__name__))
-		return f
-	return wrapper
+from threading import Thread
+from .audio_streams import MicrophoneStream
 
 class Detector:
 	def __init__(self, source='mic'):
 		self.source = source
+		self.frames = list()
 	
-	def start(self):
+	def start(self, callback):
 		if self.source == 'mic':
-			self.chunk_size = 1600
-			sample_format = pyaudio.paInt16 
-			channels = 1
-			self.frame_rate = 16000
-			self.seconds = 3
-
-			p = pyaudio.PyAudio() 
-			self.stream = p.open(format=sample_format,
-					channels=channels,
-					rate=self.frame_rate,
-					frames_per_buffer=self.chunk_size,
-					input=True)
+			self.mic_stream =  MicrophoneStream(self)
+			self.num_of_required_frames = self.mic_stream.start()
 
 			self.running = True
-			self.is_paused = False
-			self.thread = Thread(target=self._handle_predictions, daemon=True)
-			self.thread.daemon = True
+			self.thread = Thread(target=self._handle_predictions, args=(callback,))
 			self.thread.start()
 
+			print("Listening to microphone ...")
+			while True:
+				try:
+					time.sleep(1)
+				except KeyboardInterrupt:
+					self.mic_stream.stop()
+					self.stop()
+					break
 
-	# @timing_val
-	def _generate_mfcc(self,bytestring ,fs):
+	def stop(self):
+		if self.thread:
+			self.running = False
+			self.thread.join()
+			self.thread = None
+			print('Done listening')
+
+
+	def _generate_mfcc(self,bytestring):
 		audio_clip = np.frombuffer(bytestring, dtype=np.int16)
-		return mfcc(audio_clip, fs)
+		return mfcc(audio_clip, self.mic_stream.frame_rate)
 
-	@timing_val
-	def _get_next_bytestring(self,frames, num_of_required_frames):
-		frames.append(self.stream.read(self.chunk_size))
-		if len(frames) <  num_of_required_frames:
-			return
-		elif len(frames) > num_of_required_frames:
-			while len(frames) != num_of_required_frames:
-				frames.pop(0)
+	def add_audio_chunk(self,chunk):
+		self.frames.append(chunk)
 
-		if len(frames) == num_of_required_frames:
-			bytestring = b''.join(frames)
-			mfcc_feat = self._generate_mfcc(bytestring,self.frame_rate)
-			# print('_handle_predictions',mfcc_feat.shape)
-		
-
-	def _handle_predictions(self):
-		print('Recording')
-		num_of_required_frames = self.frame_rate * self.seconds/ self.chunk_size
-		frames = list()
+	def _handle_predictions(self, callback):
 		while self.running:
-			self._get_next_bytestring(frames,num_of_required_frames)
+			if self.mic_stream.new_chunk_event.is_set():
+				if len(self.frames) <  self.num_of_required_frames:
+					pass
+				elif len(self.frames) > self.num_of_required_frames:
+					while len(self.frames) != self.num_of_required_frames:
+						self.frames.pop(0)
+
+				if len(self.frames) == self.num_of_required_frames:
+					bytestring = b''.join(self.frames)
+					mfcc_feat = self._generate_mfcc(bytestring)
+					if callback:
+						callback(mfcc_feat)
+				print('frames',len(self.frames))
+
+				self.mic_stream.new_chunk_event.clear()

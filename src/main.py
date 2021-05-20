@@ -28,9 +28,11 @@ def start_training():
 def analyze_mic_data():
 	from detection import Detector
 	detector = Detector()
-	detector.start()
-	while True:
-		pass
+	def callback(mfcc):
+		print(mfcc.shape)
+	
+	detector.start(callback)
+
 
 if __name__ == "__main__":
 	# prepare_data()

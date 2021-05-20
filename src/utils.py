@@ -13,8 +13,9 @@ import time
 
 def timing_val(func):
 	def wrapper(*arg, **kw):
-		t1 = time.time()
+		t1 = time.time()*1000
 		res = func(*arg, **kw)
-		t2 = time.time()
-		print((t2 - t1), res, func.__name__)
+		t2 = time.time()*1000
+		print('{} took {:.2f} ms'.format(func.__name__,(t2 - t1)))
+		return res
 	return wrapper

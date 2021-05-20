@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#mfcc! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 #
@@ -15,11 +15,13 @@ from python_speech_features import mfcc
 import time
 from threading import Thread
 from .audio_streams import MicrophoneStream
+from .engine import Engine
 
 class Detector:
 	def __init__(self, source='mic'):
 		self.source = source
 		self.frames = list()
+		self.engine = Engine()
 	
 	def start(self, callback):
 		if self.source == 'mic':
@@ -66,8 +68,9 @@ class Detector:
 				if len(self.frames) == self.num_of_required_frames:
 					bytestring = b''.join(self.frames)
 					mfcc_feat = self._generate_mfcc(bytestring)
+					pred = self.engine.predict(mfcc_feat)
 					if callback:
-						callback(mfcc_feat)
+						callback(pred)
 				print('frames',len(self.frames))
 
 				self.mic_stream.new_chunk_event.clear()

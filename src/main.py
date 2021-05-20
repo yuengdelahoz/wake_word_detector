@@ -21,15 +21,16 @@ def create_dataset():
 	from data import generate_dataset
 	generate_dataset()
 
-def start_training():
-	from train import build_and_train
+def train_and_export():
+	from train import build_and_train, export
 	build_and_train()
+	export()
 
 def analyze_mic_data():
 	from detection import Detector
 	detector = Detector()
-	def callback(mfcc):
-		print(mfcc.shape)
+	def callback(pred):
+		print(pred)
 	
 	detector.start(callback)
 
@@ -37,7 +38,7 @@ def analyze_mic_data():
 if __name__ == "__main__":
 	# prepare_data()
 	# create_dataset()
-	# start_training()
+	# train_and_export()
 	analyze_mic_data()
 	
 

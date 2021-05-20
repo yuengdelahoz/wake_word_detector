@@ -16,19 +16,12 @@ import time
 import sys
 import tensorflow as tf
 import os
+from utils import timing_val
+from glob import glob
 
 def create_folder(path):
 	if not os.path.exists(path):
 		os.makedirs(path)
-
-def timing_val(func):
-	def wrapper(*arg, **kw):
-		t1 = time.time()
-		f = func(*arg, **kw)
-		t2 = time.time()
-		print('It took {:.2f} secs to execute function {}'.format((t2 - t1), func.__name__))
-		return f
-	return wrapper
 
 @timing_val
 def _load_split(dataset, split_name):
@@ -49,6 +42,23 @@ def _load_dataset():
 		X_test,y_test =_load_split(dataset_split,'test') 
 
 	return X_train, X_validation, X_test, y_train, y_validation, y_test
+
+@timing_val
+def export():
+	model = build_model((299,13))
+	checkpoints = glob('output/checkpoints/*.index')
+	checkpoint_path = ''
+	_max_epoch = 0
+	for ch in checkpoints:
+		epoch = int(ch.split('-')[1])
+		if epoch > _max_epoch:
+			_max_epoch = epoch
+			checkpoint_path = ch
+
+	model.load_weights('output/checkpoints/chk-47-0.02464273.ckpt')
+	print('saving model in checkpoint',checkpoint_path)
+	model.save('output/model')
+
 
 @timing_val
 def build_and_train():
@@ -73,9 +83,11 @@ def build_and_train():
 	model.summary()
 	callbacks = list()
 
-	callbacks.append(tf.keras.callbacks.TensorBoard())
+	log_dir ="output/logs"
+	create_folder(log_dir)
+	callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=log_dir))
 
-	checkpoint_filepath = 'checkpoints/chk-{epoch:02d}-{val_loss:.8f}.ckpt'
+	checkpoint_filepath = 'output/checkpoints/chk-{epoch:02d}-{val_loss:.8f}.ckpt'
 	checkpoint_dir = os.path.dirname(checkpoint_filepath)
 	create_folder(checkpoint_dir)
 	model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -93,6 +105,6 @@ def build_and_train():
 	history = model.fit(X_train,y_train, 
 			validation_data=(X_validation,y_validation),
 			batch_size=128,
-			epochs=30,
+			epochs=50,
 			callbacks = callbacks
 			)

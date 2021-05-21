@@ -23,8 +23,10 @@ class Engine:
 	@timing_val
 	def predict(self,mfcc_feat): 
 		_input = np.expand_dims(mfcc_feat,axis=0)
+		# _input = np.expand_dims(_input ,axis=-1)
 		pred = self.model.predict(_input)[0]
-		idx = np.argmax(pred)
-		confidence = pred[idx]
-		return (idx,confidence)
+		# idx = np.argmax(pred)
+		# confidence = pred[idx]
+		# return (idx,confidence)
+		return pred
 

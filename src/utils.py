@@ -10,6 +10,7 @@
 
 """
 import time
+import os
 
 def timing_val(func):
 	def wrapper(*arg, **kw):
@@ -19,3 +20,7 @@ def timing_val(func):
 		print('{} took {:.2f} ms'.format(func.__name__,(t2 - t1)))
 		return res
 	return wrapper
+
+def create_folder(path):
+	if not os.path.exists(path):
+		os.makedirs(path)

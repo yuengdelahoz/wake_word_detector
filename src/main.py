@@ -22,9 +22,8 @@ def create_dataset():
 	generate_dataset()
 
 def train_and_export():
-	from train import build_and_train, export
+	from train import build_and_train
 	build_and_train()
-	export()
 
 def analyze_mic_data():
 	from detection import Detector

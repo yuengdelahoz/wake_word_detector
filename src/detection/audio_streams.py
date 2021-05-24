@@ -17,6 +17,7 @@ class MicrophoneStream:
 	def __init__(self, detector):
 		self.chunk_size = 1600
 		self.sample_format = pyaudio.paInt16 
+		# self.sample_format = pyaudio.paFloat32
 		self.channels = 1
 		self.frame_rate = 16000
 		self.seconds = 3
@@ -28,8 +29,10 @@ class MicrophoneStream:
 		self.stream = p.open(format=self.sample_format,
 				channels=self.channels,
 				rate=self.frame_rate,
-				frames_per_buffer=self.chunk_size,
-				input=True)
+				input=True,
+				output=False,
+				frames_per_buffer=self.chunk_size
+				)
 
 		self.running = True
 		self.thread = Thread(target=self._handle_new_audio_chunk, daemon=True)

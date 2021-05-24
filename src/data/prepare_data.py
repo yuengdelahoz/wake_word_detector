@@ -9,16 +9,46 @@
 """
 
 """
-import librosa
 import os
 import shutil
-from . import utils
+import utils
 import numpy as np
 from pydub import AudioSegment, silence, effects
 import math
 import traceback
-import sys
 from glob import glob
+
+def _split_originals(AUDIO_FILE_PATH):
+	output_folder = "/audio_files/dataset/original_splits"
+	if os.path.exists(output_folder):
+		return output_folder
+	audio_files = list()
+	for root, dirnames, filenames in os.walk(AUDIO_FILE_PATH):
+		for f in filenames:
+			ext = f.split('.')[-1]
+			if ext in ['mp3','wav','m4a']:
+				file_path = os.path.join(root,f)
+				audio_files.append(file_path)
+	np.random.shuffle(audio_files)
+	train_cnt = int(np.ceil(len(audio_files)*0.8))
+
+	for src_path in audio_files:
+		folder_name=''
+		if train_cnt > 0:
+			train_cnt -= 1
+			folder_name='train'
+		else:
+			folder_name='test'
+			
+		dirname = os.path.basename(os.path.dirname(src_path))
+		outname = os.path.basename(src_path)
+		dst_path = os.path.join(output_folder,folder_name,dirname)
+		utils.create_folder(dst_path)
+		dst_path = os.path.join(dst_path,outname)
+		shutil.copyfile(src_path,dst_path)
+		print(src_path,dst_path)
+	return output_folder
+
 
 BACKGROUND_NOISE_FOLDER = None
 n_idx = 0
@@ -39,7 +69,6 @@ def get_next_background_noise_chunk(audio_file):
 		n_idx = 0
 	assert len(n_chunks) == 3
 	return n_chunks
-
 
 def speed_change(sound, speed=1.0):
 	# Manually override the frame_rate. This tells the computer how many
@@ -100,7 +129,6 @@ def _add_background_noise(audio_file,duration_thres):
 	clips.append(new_audio)
 	return clips
 
-
 def _augment_in_time_domain(audio_file, duration_thres):
 	augmented_clips = list()
 
@@ -125,6 +153,7 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 	utils.create_folder(OUTPUT_FOLDER)
 	exit = False
 	global_cnt = 0
+
 	for root, dirs, filenames in os.walk(AUDIO_FILE_PATH):
 		try:
 			if root == OUTPUT_FOLDER:
@@ -143,6 +172,13 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 					continue
 
 			cnt = 0
+			if 'test' in root:
+				OUTPUT_FOLDER2 = os.path.join(OUTPUT_FOLDER,'test')
+			elif 'train' in root:
+				OUTPUT_FOLDER2 = os.path.join(OUTPUT_FOLDER,'train')
+
+			utils.create_folder(OUTPUT_FOLDER2)
+
 			for f in filenames:
 				file_path = os.path.join(root,f)
 				size =math.ceil(os.path.getsize(file_path)/1024)
@@ -163,7 +199,7 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 							global_cnt +=1
 							print(global_cnt,file_path,"-->")
 							clips = list()
-							if augment:
+							if augment and 'test' not in root:
 								clips = _augment_audio(audio_file,duration_thres)
 							else:
 								start = int((duration_thres - duration)/2)
@@ -172,7 +208,7 @@ def _fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, duration_thr
 								clips.append(new_audio)
 
 							for clip in clips:
-								out_file = os.path.join(OUTPUT_FOLDER,'{}_file_{:08d}.wav'.format(os.path.basename(root),cnt))
+								out_file = os.path.join(OUTPUT_FOLDER2,'{}_file_{:08d}.wav'.format(os.path.basename(root),cnt))
 								new_audio = clip.set_channels(1)
 								new_audio = new_audio.set_sample_width(2)
 								new_audio = new_audio.set_frame_rate(16000)
@@ -197,7 +233,7 @@ def prepare_mozilla_common_data(AUDIO_FILE_PATH):
 		_fix_duration_and_convert_audio(AUDIO_FILE_PATH, OUTPUT_FOLDER, file_size_thresh = 17)
 
 	audio_clips = os.listdir(OUTPUT_FOLDER) # total clips
-	OUTPUT_FOLDER_2 ="/audio_files/dataset/classes/zero_class"
+	OUTPUT_FOLDER_2 ="/audio_files/dataset/classes/non-target"
 
 	exists = os.path.exists(OUTPUT_FOLDER_2)
 	if not exists  or ( exists and len(os.listdir(OUTPUT_FOLDER_2)) != 10000):
@@ -216,9 +252,10 @@ def prepare_mozilla_common_data(AUDIO_FILE_PATH):
 	else:
 		print("Noting to do")
 	
-
 def prepare_hey_ida_data(AUDIO_FILE_PATH):
-	OUTPUT_FOLDER = "/audio_files/dataset/classes/one_class"
+	AUDIO_FILE_PATH = _split_originals(AUDIO_FILE_PATH)
+	OUTPUT_FOLDER = "/audio_files/dataset/classes/target"
+
 	global BACKGROUND_NOISE_FOLDER
 	BACKGROUND_NOISE_FOLDER = glob("/audio_files/background_noise_chunks/*.wav")
 	np.random.shuffle(BACKGROUND_NOISE_FOLDER)

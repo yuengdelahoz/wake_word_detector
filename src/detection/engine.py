@@ -20,7 +20,7 @@ class Engine:
 		self.model = tf.keras.models.load_model(path)
 		self.model.summary()
 
-	@timing_val
+	# @timing_val
 	def predict(self,mfcc_feat): 
 		_input = np.expand_dims(mfcc_feat,axis=0)
 		# _input = np.expand_dims(_input ,axis=-1)
@@ -29,4 +29,5 @@ class Engine:
 		# confidence = pred[idx]
 		# return (idx,confidence)
 		return pred
+
 

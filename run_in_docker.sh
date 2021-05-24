@@ -11,10 +11,13 @@ xhost +
 docker run --rm -it \
 	--net=host \
 	--gpus all \
+	--device /dev/snd:/dev/snd \
 	-w /src \
 	-v $DIR/src:/src \
 	-v $DIR/audio_files:/audio_files \
 	-v /home/yuengdelahoz/Music/mozilla_common_voice_01/clips/:/audio_files2 \
-	tensorflow-gpu-audio python3 main.py
-	#tensorflow-gpu-audio
+	#tensorflow-gpu-audio python3 main.py
+	tensorflow-gpu-audio
+
+sudo chown yuengdelahoz:yuengdelahoz -R .
 

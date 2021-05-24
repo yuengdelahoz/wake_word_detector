@@ -14,7 +14,6 @@ from pydub import AudioSegment
 import os
 
 import pydub
-from python_speech_features import mfcc
 import numpy as np
 from glob import glob
 import traceback
@@ -22,10 +21,8 @@ import json
 from collections import namedtuple
 import librosa
 from utils import timing_val
-
-def _generate_mfcc(audio_file):
-	audio_clip = np.frombuffer(audio_file.get_array_of_samples(), dtype=np.int16)
-	return mfcc(audio_clip, samplerate=audio_file.frame_rate)
+from python_speech_features import mfcc
+import librosa
 
 @timing_val
 def _generate_dataset(AUDIO_FILE_PATH, OUTPUT_FOLDER):
@@ -160,12 +157,12 @@ def _generate_dataset2(AUDIO_FILE_PATH, OUTPUT_FOLDER):
 		np.random.shuffle(audio_filenames)
 
 		for file_path in audio_filenames:
-			if 'one_class' in file_path:
-				label_id = 1
-				dataset['mappings'].update({"target": 1})
-			else:
+			if 'non-target' in file_path:
 				label_id = 0
 				dataset['mappings'].update({"non-target": 0})
+			else:
+				label_id = 1
+				dataset['mappings'].update({"target": 1})
 
 			if label_id not in dataset['class_counter']:
 				dataset['class_counter'][label_id] = 0
@@ -258,12 +255,86 @@ def _split_dataset2(dataset):
 	assert counter == len(labels)
 	return split_dataset
 
+@timing_val
+def _generate_dataset3(AUDIO_FILE_PATH, OUTPUT_FOLDER, mfcc_lib="psf", chunk_length = 3000):
+	out_file = os.path.join(OUTPUT_FOLDER,"dataset.json")
+	sample_rate = 16000
+	exit = False
+	if os.path.exists(out_file):
+		print('loading dataset')
+		with open(out_file, "r") as fp:
+			dataset = json.load(fp)
+	else:
+		utils.create_folder(OUTPUT_FOLDER)
+		global_cnt = 0
+		dataset = {"mfcc_library":mfcc_lib,"mappings":{}}
+
+		audio_filenames = list()
+		for root, dirs, filenames in os.walk(AUDIO_FILE_PATH):
+			if 'non-target' in root:
+				dataset['mappings'].update({"non-target": 0})
+			else:
+				dataset['mappings'].update({"target": 1})
+
+			for f in filenames:
+				if f.endswith('.wav'):
+					file_path = os.path.join(root,f)
+					audio_filenames.append(file_path)
+
+		np.random.shuffle(audio_filenames)
+
+		for file_path in audio_filenames:
+			if 'non-target' in file_path :
+				label_id = 0
+			else:
+				label_id = 1
+
+			split_name = 'train'
+			if '/target/' in file_path:
+				if 'test' in file_path:
+					split_name = 'test'
+
+			if split_name not in dataset:
+				dataset[split_name] = {
+						"class_counter":{},
+						"audio_path":[],
+						"labels":[],
+						"mfccs":[]
+						}
+
+			if label_id not in dataset[split_name]['class_counter']:
+				dataset[split_name]['class_counter'][label_id] = 0
+
+			dataset[split_name]['class_counter'][label_id] += 1
+			try:
+				mfccs = list()
+				if mfcc_lib == "librosa":
+					audio_file, sr = librosa.load(file_path, sr=sample_rate)
+					mfcc_feat = utils.generate_mfcc(audio_file,sample_rate,use='librosa')
+				else: # psf
+					audio_file = AudioSegment.from_file(file_path)
+					mfcc_feat = utils.generate_mfcc(audio_file,sample_rate)
+
+				dataset[split_name]['mfccs'].append(mfcc_feat.tolist())
+				dataset[split_name]['labels'].append(label_id)
+				dataset[split_name]['audio_path'].append(file_path)
+				global_cnt += 1
+				if global_cnt % 100 == 0:
+					print(global_cnt,'processing',file_path,'mfcc',mfcc_feat.shape,'label',label_id)
+					print(duration)
+			except KeyboardInterrupt:
+				exit = True
+				break
+			except:
+				traceback.print_exc()
+
+	if not exit:
+		with open(out_file, "w") as fp:
+			json.dump(dataset,fp, indent=6)
+	print('dataset generated')
+	return dataset
+
 def generate_dataset():
 	AUDIO_FILE_PATH = "/audio_files/dataset/classes"
 	OUTPUT_FOLDER = "/audio_files/dataset"
-	dataset =_generate_dataset2(AUDIO_FILE_PATH,OUTPUT_FOLDER)
-	# dataset = []
-	split_dataset= _split_dataset2(dataset)
-	out_file = os.path.join(OUTPUT_FOLDER,"dataset_split.json")
-	with open(out_file, "w") as fp:
-		json.dump(split_dataset,fp, indent=6)
+	_generate_dataset3(AUDIO_FILE_PATH,OUTPUT_FOLDER)

@@ -18,7 +18,9 @@ from glob import glob
 
 def model_01(input_shape):
 	model = Sequential([
-		LSTM(128,input_shape=input_shape),
+		InputLayer(input_shape=input_shape),
+		BatchNormalization(),
+		LSTM(128),
 		Dropout(0.3),
 		Dense(2, activation='softmax')
 		])
@@ -26,6 +28,7 @@ def model_01(input_shape):
 
 def model_02(input_shape):
 	model = Sequential([
+		BatchNormalization(),
 		LSTM(128,input_shape=input_shape),
 		Dropout(0.3),
 		Dense(64, activation='relu'),
@@ -35,7 +38,9 @@ def model_02(input_shape):
 
 def model_03(input_shape):
 	model = Sequential([
-		GRU(20,input_shape=input_shape),
+		InputLayer(input_shape=input_shape),
+		BatchNormalization(),
+		GRU(20),
 		Dropout(0.3),
 		Dense(1, activation='sigmoid')
 		])
@@ -44,20 +49,22 @@ def model_03(input_shape):
 def model_04(input_shape):
 	model = Sequential()
 	model.add(InputLayer(input_shape=input_shape))
+	model.add(BatchNormalization())
+	model.add(InputLayer(input_shape=input_shape))
 	model.add(Conv2D(64, (3, 3), activation='relu'))
 	model.add(MaxPooling2D((3, 3), strides=(2,2), padding='same'))
 	model.add(BatchNormalization())
 	model.add(Dropout(0.3))
 
-	# model.add(Conv2D(64, (3, 3), activation='relu'))
-	# model.add(MaxPooling2D((3, 3), strides=(2,2), padding='same'))
-	# model.add(BatchNormalization())
-	# model.add(Dropout(0.3))
+	model.add(Conv2D(64, (3, 3), activation='relu'))
+	model.add(MaxPooling2D((3, 3), strides=(2,2), padding='same'))
+	model.add(BatchNormalization())
+	model.add(Dropout(0.3))
 
-	# model.add(Conv2D(32, (3, 3), activation='relu'))
-	# model.add(MaxPooling2D((3, 3), strides=(2,2), padding='same'))
-	# model.add(BatchNormalization())
-	# model.add(Dropout(0.3))
+	model.add(Conv2D(32, (3, 3), activation='relu'))
+	model.add(MaxPooling2D((3, 3), strides=(2,2), padding='same'))
+	model.add(BatchNormalization())
+	model.add(Dropout(0.3))
 
 	model.add(Flatten())
 	model.add(Dense(64, activation='relu'))
@@ -77,8 +84,6 @@ class TrainingModel:
 		self.model_index = model_index;
 		self.model = available_models.get(model_index)(input_shape)
 		self.model_index = model_index
-		self.model.summary()
-		input()
 
 	def export(self):
 		''' pick the best weights based on the validation loss '''
@@ -96,7 +101,7 @@ class TrainingModel:
 		self.model.save('output/model')
 		print('saving model in checkpoint',checkpoint_path)
 	
-	def train(self, X_train, X_validation, X_test, y_train, y_validation, y_test):
+	def train(self, X_train, X_test, y_train, y_test):
 		# compile model
 		optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
@@ -112,7 +117,6 @@ class TrainingModel:
 		else:
 			loss='categorical_crossentropy',
 			y_train = tf.one_hot(y_train ,num_outputs)
-			y_validation =tf.one_hot(y_validation ,num_outputs)
 			y_test = tf.one_hot(y_test ,num_outputs)
 
 			metrics=[
@@ -148,12 +152,15 @@ class TrainingModel:
 		callbacks.append(model_checkpoint_callback)
 
 		# train model
-		self.model.fit(X_train,y_train, 
-				validation_data=(X_validation,y_validation),
-				batch_size=64,
-				epochs=5,
-				callbacks = callbacks
-				)
+		try:
+			self.model.fit(X_train,y_train, 
+					validation_data=(X_test,y_test),
+					batch_size=168,
+					epochs=100,
+					callbacks = callbacks
+					)
+		except KeyboardInterrupt:
+			pass
 
 		self.export() # load model with best weights and export
 		self.model.evaluate(X_test,y_test, verbose=2)
